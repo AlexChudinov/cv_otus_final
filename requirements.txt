@@ -1,0 +1,8 @@
+torch
+transformers
+pillow
+opencv-python-headless
+matplotlib
+qwen_vl_utils
+torchvision
+accelerate
