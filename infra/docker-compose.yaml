@@ -1,0 +1,9 @@
+services:
+  dataset:
+    build:
+      context: ../dataset
+      dockerfile: ../dataset/Dockerfile
+    volumes:
+      - ../dataset/datafiles:/app/datafiles
+    ports:
+      - 7860:7860
