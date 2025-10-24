@@ -1,3 +1,5 @@
-dvc
-pillow
 gradio
+litellm
+pillow
+psycopg2-binary
+pgvector
