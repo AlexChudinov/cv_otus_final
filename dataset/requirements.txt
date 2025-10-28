@@ -3,3 +3,4 @@ litellm
 pillow
 psycopg2-binary
 pgvector
+fiftyone

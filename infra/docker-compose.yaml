@@ -1,10 +1,20 @@
 services:
-  gradio_service:
+  fiftyone:
+    restart: always
     build:
       context: ../dataset
       dockerfile: ../dataset/Dockerfile
     volumes:
-      - images:${IMAGES_PATH}
+      - ${HOST_IMAGES_PATH}:${IMAGES_PATH}
+    command: ["python", "-m", "impl.coco_uploader", "--output_dir", "${IMAGES_PATH}"]
+
+  gradio_service:
+    restart: always
+    build:
+      context: ../dataset
+      dockerfile: ../dataset/Dockerfile
+    volumes:
+      - ${HOST_IMAGES_PATH}:${IMAGES_PATH}
     env_file:
       - path: .env
         required: true
@@ -23,24 +33,6 @@ services:
     depends_on:
       - db
 
-  vllm:
-    image: vllm/vllm-openai:latest
-    volumes:
-      - ./cache:/root/.cache/huggingface
-    ipc: host
-    ports:
-      - 8000:8000
-    command:
-      - --model
-      - Qwen/Qwen2-VL-2B-Instruct
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: ${GPU_COUNT:-1}
-              capabilities: [ gpu ]
-
   db:
     image: pgvector/pgvector:pg17
     container_name: pgvector-db
@@ -54,10 +46,5 @@ services:
       - path: .env
         required: true
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - ${PG_DATA}:/var/lib/postgresql/data
       - ./pgvector_init.sql:/docker-entrypoint-initdb.d/init.sql
-
-volumes:
-  hg_cache:
-  pgdata:
-  images:
