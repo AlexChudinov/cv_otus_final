@@ -7,6 +7,22 @@ services:
     volumes:
       - ${HOST_IMAGES_PATH}:${IMAGES_PATH}
     command: ["python", "-m", "impl.coco_uploader", "--output_dir", "${IMAGES_PATH}"]
+    environment:
+      - FIFTYONE_DATABASE_NAME=fiftyone_db
+      - FIFTYONE_DATABASE_URI=mongodb://fiftyone_user:fiftyone_pass@mongodb:27017
+    ports:
+      - 5151:5151
+    links:
+      - mongodb
+
+  mongodb:
+    image: mongo:8
+    restart: always
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=fiftyone_user
+      - MONGO_INITDB_ROOT_PASSWORD=fiftyone_pass
+    volumes:
+      - mongo_data:/data/db
 
   gradio_service:
     restart: always
@@ -48,3 +64,6 @@ services:
     volumes:
       - ${PG_DATA}:/var/lib/postgresql/data
       - ./pgvector_init.sql:/docker-entrypoint-initdb.d/init.sql
+
+volumes:
+  mongo_data:

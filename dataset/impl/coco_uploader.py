@@ -38,7 +38,8 @@ def upload_coco(output_dir: str) -> None:
 def run_fiftyone_app(output_dir: str) -> None:
     fo.config.dataset_zoo_dir = output_dir
     _logger.info("Starting FiftyOne app with COCO dataset in directory %s...", output_dir)
-    fo.launch_app()
+    session = fo.launch_app(address="0.0.0.0")
+    session.wait(-1)
 
 
 if __name__ == "__main__":

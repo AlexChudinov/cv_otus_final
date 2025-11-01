@@ -1,3 +1,5 @@
 .env
 images/
 pg_data/
+models/
+
