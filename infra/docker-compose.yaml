@@ -1,53 +1,85 @@
+x-common-env: &common-env
+  path: .env
+  required: true
+
 services:
-  fiftyone:
-    restart: always
+  init-dataset:
     build:
       context: ../dataset
       dockerfile: ../dataset/Dockerfile
     volumes:
       - ${HOST_IMAGES_PATH}:${IMAGES_PATH}
     command: ["python", "-m", "impl.coco_uploader", "--output_dir", "${IMAGES_PATH}"]
-    environment:
-      - FIFTYONE_DATABASE_NAME=fiftyone_db
-      - FIFTYONE_DATABASE_URI=mongodb://fiftyone_user:fiftyone_pass@mongodb:27017
-    ports:
-      - 5151:5151
-    links:
-      - mongodb
-
-  mongodb:
-    image: mongo:8
-    restart: always
-    environment:
-      - MONGO_INITDB_ROOT_USERNAME=fiftyone_user
-      - MONGO_INITDB_ROOT_PASSWORD=fiftyone_pass
-    volumes:
-      - mongo_data:/data/db
-
-  gradio_service:
-    restart: always
-    build:
-      context: ../dataset
-      dockerfile: ../dataset/Dockerfile
-    volumes:
-      - ${HOST_IMAGES_PATH}:${IMAGES_PATH}
     env_file:
-      - path: .env
-        required: true
-    ports:
-      - 7860:7860
+      - <<: *common-env
     environment:
-      - IMAGES_PATH=${IMAGES_PATH}
-      - GRADIO_SERVER_NAME=0.0.0.0
+      - FIFTYONE_DATABASE_NAME=${MONGO_DATABASE}
+      - FIFTYONE_DATABASE_URI=mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongodb:27017
       - POSTGRES_HOST=db
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
-    command: python gradio_service.py
     links:
-      - db
-    depends_on:
-      - db
+      - mongodb
+
+  triton:
+    image: nvcr.io/nvidia/tritonserver:24.09-py3
+    restart: always
+    env_file:
+      - <<: *common-env
+    entrypoint: ["tritonserver", "--model-repository", "/model_repository"]
+    volumes:
+      - ${MODELS_PATH}:/model_repository
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities:
+                - gpu
+    ports:
+      - 8000:8000
+      - 8001:8001
+
+  mongodb:
+    image: mongo:8
+    restart: always
+    env_file:
+      - <<: *common-env
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD}
+      - POSTGRES_HOST=db
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - mongo_data:/data/db
+
+  # gradio_service:
+  #   restart: always
+  #   build:
+  #     context: ../dataset
+  #     dockerfile: ../dataset/Dockerfile
+  #   volumes:
+  #     - ${HOST_IMAGES_PATH}:${IMAGES_PATH}
+  #   env_file:
+  #     - <<: *common-env
+  #   ports:
+  #     - 7860:7860
+  #   environment:
+  #     - IMAGES_PATH=${IMAGES_PATH}
+  #     - GRADIO_SERVER_NAME=0.0.0.0
+  #     - POSTGRES_HOST=db
+  #     - POSTGRES_USER=${POSTGRES_USER}
+  #     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+  #     - POSTGRES_DB=${POSTGRES_DB}
+  #   command: python gradio_service.py
+  #   links:
+  #     - db
+  #   depends_on:
+  #     - db
 
   db:
     image: pgvector/pgvector:pg17
@@ -57,10 +89,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "5432:5432"
+      - 5432:5432
     env_file:
-      - path: .env
-        required: true
+      - <<: *common-env
     volumes:
       - ${PG_DATA}:/var/lib/postgresql/data
       - ./pgvector_init.sql:/docker-entrypoint-initdb.d/init.sql

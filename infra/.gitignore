@@ -1,5 +1,5 @@
 .env
 images/
 pg_data/
-models/
-
+*.onnx*
+*.pt

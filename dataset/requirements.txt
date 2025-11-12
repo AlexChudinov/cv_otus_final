@@ -1,6 +1,8 @@
 gradio
-litellm
+numpy
+fiftyone
 pillow
 psycopg2-binary
 pgvector
-fiftyone
+tritonclient[grpc]
+torchvision

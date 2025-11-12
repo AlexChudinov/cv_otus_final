@@ -1,8 +1,13 @@
 torch
+torchvision
 transformers
 pillow
 opencv-python-headless
 matplotlib
 qwen_vl_utils
+tensorrt==10.4.0
 torchvision
 accelerate
+ultralytics
+onnx
+onnxruntime
