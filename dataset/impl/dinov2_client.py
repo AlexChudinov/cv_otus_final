@@ -36,7 +36,7 @@ class DINOV2Client:
         image_tensor = torchvision.transforms.Normalize(mean, std)(image_tensor)
         return image_tensor.to("cpu").numpy()[np.newaxis, ...]
 
-    def __call__(self, image: ImageFile, infer_callback) -> None:
+    def __call__(self, image: ImageFile, infer_callback):
         inputs = [grpcclient.InferInput(self.input_name, (1, 3, 224, 224), "FP32")]
         inputs[0].set_data_from_numpy(self.image_preprocessing(image))
-        self.infer_request(callback=partial(self.infer_callback, infer_callback=infer_callback), inputs=inputs)
+        return self.infer_request(callback=partial(self.infer_callback, infer_callback=infer_callback), inputs=inputs)

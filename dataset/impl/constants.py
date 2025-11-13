@@ -11,3 +11,5 @@ PGVECTOR_CREDENTIALS = {
     "password": os.getenv("POSTGRES_PASSWORD"),
     "database": os.getenv("POSTGRES_DB"),
 }
+
+IMAGES_PATH  = os.getenv("IMAGES_PATH")

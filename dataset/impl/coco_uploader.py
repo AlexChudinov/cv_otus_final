@@ -1,38 +1,51 @@
-import argparse
 import logging
 import os
 from pathlib import Path
 
 import fiftyone as fo
 import fiftyone.zoo as foz
-from .constants import DATASET, LOGGER_FORMAT, PGVECTOR_CREDENTIALS
+from .constants import DATASET, IMAGES_PATH, LOGGER_FORMAT, PGVECTOR_CREDENTIALS
 from .pgvector_client import PGVectorClient
-
+from .utils import chunked_iter
 
 logging.basicConfig(level=logging.INFO, format=LOGGER_FORMAT)
 _logger = logging.getLogger(__name__)
 _logger.setLevel(logging.DEBUG)
-
-def chunked_iter(iterable, chunk_size=100):
-    for i in range(0, len(iterable), chunk_size):
-        yield iterable[i:i + chunk_size]
 
 def init_pgvector_dataset(images_path: str, **credentials):
     client = PGVectorClient(images_path, _logger, **credentials)
 
     train_images_path: Path = Path(images_path) / DATASET / "train"
     _logger.info("Adding train images to the dataset...")
-    image_ids = client.add_images("train", map(str, train_images_path.rglob("*.jpg")))
-    _logger.info("Added %d images to the dataset", len(image_ids))
-    for images_id_chunk in chunked_iter(image_ids):
-        client.add_embeddings(images_id_chunk)
+
+    file_count = 0
+    file_uploaded_count = 0
+    for filename in chunked_iter(train_images_path.rglob("*.jpg")):
+        file_count += len(filename)
+        filename_not_in_db = client.filter_file_not_exist(filename)
+        image_ids = client.add_images("train", filename_not_in_db)
+        file_uploaded_count += len(image_ids)
+
+    _logger.info("Files count in train dataset: %d", file_count)
+    _logger.info("Added %d images to train dataset", file_uploaded_count)
+    # for images_id_chunk in chunked_iter(image_ids):
+    #     client.add_embeddings(images_id_chunk)
 
     test_images_path = Path(images_path) / DATASET / "validation"
     _logger.info("Adding test images to the dataset...")
-    image_ids = client.add_images("test", map(str, test_images_path.rglob("*.jpg")))
-    _logger.info("Added %d images to the dataset", len(image_ids))
-    for images_id_chunk in chunked_iter(image_ids):
-        client.add_embeddings(images_id_chunk)
+
+    file_count = 0
+    file_uploaded_count = 0
+    for filename in chunked_iter(test_images_path.rglob("*.jpg")):
+        file_count += len(filename)
+        filename_not_in_db = client.filter_file_not_exist(filename)
+        image_ids = client.add_images("validation", filename_not_in_db)
+        file_uploaded_count += len(image_ids)
+
+    _logger.info("Files count in validation dataset: %d", file_count)
+    _logger.info("Added %d images to validation dataset", file_uploaded_count)
+    # for images_id_chunk in chunked_iter(image_ids):
+    #     client.add_embeddings(images_id_chunk)
 
 def upload_coco(output_dir: str) -> None:
     fo.config.dataset_zoo_dir = output_dir
@@ -60,10 +73,6 @@ def upload_coco(output_dir: str) -> None:
 
 
 if __name__ == "__main__":
-    argparser = argparse.ArgumentParser("COCO dataset downloader")
-    argparser.add_argument("--output_dir", type=str, required=True, help="Directory to save the dataset")
-
-    args = argparser.parse_args()
-    abs_path = os.path.abspath(args.output_dir)
+    abs_path = os.path.abspath(IMAGES_PATH)
     upload_coco(abs_path)
     init_pgvector_dataset(abs_path, **PGVECTOR_CREDENTIALS)
