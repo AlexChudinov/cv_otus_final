@@ -7,4 +7,3 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 ENV PYTHONPATH=/app
 COPY impl /app/impl
-COPY gradio_service.py /app/gradio_service.py

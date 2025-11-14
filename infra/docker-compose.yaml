@@ -58,29 +58,29 @@ services:
     volumes:
       - mongo_data:/data/db
 
-  # gradio_service:
-  #   restart: always
-  #   build:
-  #     context: ../dataset
-  #     dockerfile: ../dataset/Dockerfile
-  #   volumes:
-  #     - ${HOST_IMAGES_PATH}:${IMAGES_PATH}
-  #   env_file:
-  #     - <<: *common-env
-  #   ports:
-  #     - 7860:7860
-  #   environment:
-  #     - IMAGES_PATH=${IMAGES_PATH}
-  #     - GRADIO_SERVER_NAME=0.0.0.0
-  #     - POSTGRES_HOST=db
-  #     - POSTGRES_USER=${POSTGRES_USER}
-  #     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-  #     - POSTGRES_DB=${POSTGRES_DB}
-  #   command: python gradio_service.py
-  #   links:
-  #     - db
-  #   depends_on:
-  #     - db
+  gradio_service:
+    restart: always
+    build:
+      context: ../dataset
+      dockerfile: ../dataset/Dockerfile
+    volumes:
+      - ${HOST_IMAGES_PATH}:${IMAGES_PATH}
+    env_file:
+      - <<: *common-env
+    ports:
+      - 7860:7860
+    environment:
+      - IMAGES_PATH=${IMAGES_PATH}
+      - GRADIO_SERVER_NAME=0.0.0.0
+      - POSTGRES_HOST=db
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    command: python -m impl.gradio_interface
+    links:
+      - db
+    depends_on:
+      - db
 
   db:
     image: pgvector/pgvector:pg17

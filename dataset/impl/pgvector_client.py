@@ -1,7 +1,6 @@
 import logging
 from pathlib import Path
 from functools import partial
-from time import sleep
 from typing import Callable, Iterable
 
 import numpy as np
@@ -10,8 +9,16 @@ import psycopg2
 from pgvector.psycopg2 import register_vector
 
 from .dinov2_client import DINOV2Client
+from .utils import CallbackManager, download_image
 
 class PGVectorClient:
+    SIMILARITY_FUNCTIONS = {
+        "cosine": "<=>",
+        "dot": "<#>",
+        "L2": "<->",
+        "L1": "<+>",
+    }
+
     def __init__(self, images_path: str, _logger: logging.Logger, **credentials):
         self.credentials = credentials
         self.images_path = Path(images_path)
@@ -88,15 +95,38 @@ class PGVectorClient:
         """
 
         filenames = self.execute_query(query=get_filenames_query, fetch=lambda cur: {row[0]: row[1] for row in cur.fetchall()})
-        added_count = []
+        callback_manager = CallbackManager()
         def embedder_callback(image_id, embedding):
             if embedding is not None:
                 self.add_embedding(image_id, embedding)
-            added_count.append(1)
+            callback_manager.done()
 
         for image_id, filename in filenames.items():
             image = Image.open(filename)
-            self.emdedder(image, partial(embedder_callback, image_id))
+            callback_manager.add()
+            embedder_run = partial(self.emdedder, image, partial(embedder_callback, image_id))
 
-        while len(added_count) < len(image_ids):
-            sleep(0.1)
+        embedder_run()
+        callback_manager.wait()
+
+    def get_neighbors(self, query_image_url: str, k: int = 10, similarity: str = "cosine") -> list[tuple[float, str]]:
+        image = download_image(query_image_url)
+        callback_manager = CallbackManager()
+
+        callback_result = []
+        def embedder_callback(embedding):
+            callback_result.append(embedding)
+            callback_manager.done()
+
+        callback_manager.add()
+        self.emdedder(image, embedder_callback)
+        callback_manager.wait()
+
+        query_embedding, *_ = callback_result
+        assert query_embedding is not None, f"Failed to build embedding for image url: {query_image_url}"
+
+        query = f"""
+            SELECT %s {self.SIMILARITY_FUNCTIONS[similarity]} embedding AS similarity, filename FROM image_embeddings
+            JOIN images ON image_embeddings.image_id = images.id ORDER BY similarity DESC LIMIT %s
+        """
+        return self.execute_query(query=query, params=(query_embedding, k), fetch=lambda cur: [(row[0], row[1]) for row in cur.fetchall()])

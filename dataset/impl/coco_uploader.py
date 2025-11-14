@@ -28,8 +28,7 @@ def init_pgvector_dataset(images_path: str, **credentials):
 
     _logger.info("Files count in train dataset: %d", file_count)
     _logger.info("Added %d images to train dataset", file_uploaded_count)
-    # for images_id_chunk in chunked_iter(image_ids):
-    #     client.add_embeddings(images_id_chunk)
+
 
     test_images_path = Path(images_path) / DATASET / "validation"
     _logger.info("Adding test images to the dataset...")
@@ -44,8 +43,7 @@ def init_pgvector_dataset(images_path: str, **credentials):
 
     _logger.info("Files count in validation dataset: %d", file_count)
     _logger.info("Added %d images to validation dataset", file_uploaded_count)
-    # for images_id_chunk in chunked_iter(image_ids):
-    #     client.add_embeddings(images_id_chunk)
+
 
 def upload_coco(output_dir: str) -> None:
     fo.config.dataset_zoo_dir = output_dir
