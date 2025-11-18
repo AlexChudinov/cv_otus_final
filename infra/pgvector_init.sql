@@ -11,5 +11,10 @@ CREATE TABLE IF NOT EXISTS image_embeddings (
     embedding VECTOR(768) NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS yolo_image_predictions (
+    image_id INT NOT NULL,
+    predictions VECTOR(840) NOT NULL
+);
+
 CREATE UNIQUE INDEX IF NOT EXISTS image_embeddings_image_id_idx ON image_embeddings(image_id);
 CREATE UNIQUE INDEX IF NOT EXISTS images_filename_idx ON images(filename);

@@ -10,6 +10,7 @@ from pgvector.psycopg2 import register_vector
 
 from .dinov2_client import DINOV2Client
 from .utils import CallbackManager, download_image
+from .yolov8_client import YOLOClient
 
 class PGVectorClient:
     SIMILARITY_FUNCTIONS = {
@@ -24,6 +25,7 @@ class PGVectorClient:
         self.images_path = Path(images_path)
         self.logger = _logger
         self.emdedder = DINOV2Client(logger=self.logger)
+        self.detector = YOLOClient(logger=self.logger)
 
     def execute_query(cls, query: str, params: tuple = None, fetch: Callable = None):
         with psycopg2.connect(**cls.credentials) as conn:
@@ -109,7 +111,7 @@ class PGVectorClient:
         embedder_run()
         callback_manager.wait()
 
-    def get_neighbors(self, query_image_url: str, k: int = 10, similarity: str = "cosine") -> list[tuple[float, str]]:
+    def get_neighbors(self, query_image_url: str, k: int = 10, similarity: str = "cosine") -> tuple[list[tuple[float, str]], Image.Image]:
         image = download_image(query_image_url)
         callback_manager = CallbackManager()
 
@@ -122,11 +124,23 @@ class PGVectorClient:
         self.emdedder(image, embedder_callback)
         callback_manager.wait()
 
-        query_embedding, *_ = callback_result
+        query_embedding = callback_result.pop()
         assert query_embedding is not None, f"Failed to build embedding for image url: {query_image_url}"
 
         query = f"""
             SELECT %s {self.SIMILARITY_FUNCTIONS[similarity]} embedding AS similarity, filename FROM image_embeddings
             JOIN images ON image_embeddings.image_id = images.id ORDER BY similarity DESC LIMIT %s
         """
-        return self.execute_query(query=query, params=(query_embedding, k), fetch=lambda cur: [(row[0], row[1]) for row in cur.fetchall()])
+
+        def detector_callback(bboxes):
+            callback_result.append(self.detector.draw_bboxes(bboxes, image))
+            callback_manager.done()
+
+        callback_manager.add()
+        self.detector(image, detector_callback)
+        callback_manager.wait()
+
+        return (
+            self.execute_query(query=query, params=(query_embedding, k), fetch=lambda cur: [(row[0], row[1]) for row in cur.fetchall()]),
+            callback_result.pop()
+        )

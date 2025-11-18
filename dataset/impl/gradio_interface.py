@@ -24,17 +24,16 @@ class Service(gr.Blocks):
                          title='Поиск похожих изображений')
 
     def query(self, image_url: str, number_of_images: int, similarity: str) -> list[gr.Image]:
-        output = self.database.get_neighbors(image_url, number_of_images, similarity)
-        print(output)
+        output, orig_image = self.database.get_neighbors(image_url, number_of_images, similarity)
         show = [
             gr.Image(value=filename, visible=True, label=f'{round(similarity, 2)}')
             for similarity, filename in output
         ]
         hide = [
             gr.Image(visible=False)
-            for _ in range(21 - number_of_images)
+            for _ in range(20 - number_of_images)
         ]
-        return [gr.Image(value=download_image(image_url), visible=True, label="Запрос")] + show + hide
+        return [gr.Image(value=orig_image, visible=True, label="Запрос")] + show + hide
 
 if __name__ == '__main__':
     service = Service(IMAGES_PATH, PGVECTOR_CREDENTIALS)
