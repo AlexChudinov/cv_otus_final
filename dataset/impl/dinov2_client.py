@@ -6,6 +6,8 @@ import tritonclient.grpc as grpcclient
 import numpy as np
 from PIL.ImageFile import ImageFile
 
+from .utils import create_logger
+
 class DINOV2Client:
     def __init__(self,
                  *,
@@ -14,7 +16,7 @@ class DINOV2Client:
                  input_name: str = "input",
                  output_name: str = "pooler_output",
                  logger: logging.Logger = None):
-        self.logger = logger or logging.getLogger(__name__)
+        self.logger = logger or create_logger()
         self.client = grpcclient.InferenceServerClient(url=server_url)
         self.input_name = input_name
         self.outputs = [ grpcclient.InferRequestedOutput(output_name) ]

@@ -1,12 +1,9 @@
-import logging
-
-from .constants import IMAGES_PATH, LOGGER_FORMAT, PGVECTOR_CREDENTIALS
+from .constants import IMAGES_PATH, PGVECTOR_CREDENTIALS
 from .pgvector_client import PGVectorClient
 
+from .utils import create_logger
 
-logging.basicConfig(level=logging.INFO, format=LOGGER_FORMAT)
-_logger = logging.getLogger(__name__)
-_logger.setLevel(logging.DEBUG)
+_logger = create_logger()
 
 def encoder_images():
     client = PGVectorClient(IMAGES_PATH, _logger, **PGVECTOR_CREDENTIALS)

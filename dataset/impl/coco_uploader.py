@@ -1,16 +1,13 @@
-import logging
 import os
 from pathlib import Path
 
 import fiftyone as fo
 import fiftyone.zoo as foz
-from .constants import DATASET, IMAGES_PATH, LOGGER_FORMAT, PGVECTOR_CREDENTIALS
+from .constants import DATASET, IMAGES_PATH, PGVECTOR_CREDENTIALS
 from .pgvector_client import PGVectorClient
-from .utils import chunked_iter
+from .utils import chunked_iter, create_logger
 
-logging.basicConfig(level=logging.INFO, format=LOGGER_FORMAT)
-_logger = logging.getLogger(__name__)
-_logger.setLevel(logging.DEBUG)
+_logger = create_logger()
 
 def init_pgvector_dataset(images_path: str, **credentials):
     client = PGVectorClient(images_path, _logger, **credentials)

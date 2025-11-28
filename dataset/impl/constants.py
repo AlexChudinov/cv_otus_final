@@ -2,6 +2,7 @@ import os
 
 DATASET = "coco-2017"
 
+LOG_LEVEL=os.getenv("LOG_LEVEL", "DEBUG")
 LOGGER_FORMAT='[%(asctime)s] %(levelname)s: %(message)s'
 
 PGVECTOR_CREDENTIALS = {
@@ -99,3 +100,5 @@ COCO_LABELS = {
   78: "hair drier",
   79: "toothbrush"
 }
+
+YOLO_PREDICTIONS_BUTCH = 100

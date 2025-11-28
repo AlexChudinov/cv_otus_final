@@ -1,6 +1,7 @@
 import logging
-from pathlib import Path
 from functools import partial
+from multiprocessing import Lock
+from pathlib import Path
 from typing import Callable, Iterable
 
 import numpy as np
@@ -8,6 +9,7 @@ from PIL import Image
 import psycopg2
 from pgvector.psycopg2 import register_vector
 
+from .constants import YOLO_PREDICTIONS_BUTCH
 from .dinov2_client import DINOV2Client
 from .utils import CallbackManager, download_image
 from .yolov8_client import YOLOClient
@@ -48,6 +50,12 @@ class PGVectorClient:
                 self.logger.warning(f"Image {filename} already exists in the database")
         return image_ids
 
+    def get_filenames(self, image_ids: list[int]) -> list[tuple[int, str]]:
+        query = f"""
+            SELECT id, filename FROM images WHERE id IN ({','.join(map(str, image_ids))})
+        """
+        return self.execute_query(query=query, fetch=lambda cur: {image_id: filename for image_id, filename in cur.fetchall()})
+
     def filter_file_exist(self, filenames: list[str | Path]) -> list[str]:
         filenames = [f"'{filename}'" for filename in filenames]
         query = f"""
@@ -61,7 +69,7 @@ class PGVectorClient:
 
     def filter_embedding_exist(self, image_ids: list[int]) -> list[int]:
         query = f"""
-            SELECT image_id FROM image_embeddings WHERE image_id in ({','.join(map(str, image_ids))})
+            SELECT image_id FROM image_embeddings WHERE image_id IN ({','.join(map(str, image_ids))})
         """
         return self.execute_query(query=query, fetch=lambda cur: [row[0] for row in cur.fetchall()])
 
@@ -92,11 +100,7 @@ class PGVectorClient:
         self.execute_query(query=query, params=(image_id, embedding))
 
     def add_embeddings(self, image_ids: list[int]) -> None:
-        get_filenames_query = f"""
-            SELECT id, filename FROM images WHERE id in ({','.join(map(str, image_ids))})
-        """
-
-        filenames = self.execute_query(query=get_filenames_query, fetch=lambda cur: {row[0]: row[1] for row in cur.fetchall()})
+        filenames = self.get_filenames(image_ids)
         callback_manager = CallbackManager()
         def embedder_callback(image_id, embedding):
             if embedding is not None:
@@ -106,12 +110,31 @@ class PGVectorClient:
         for image_id, filename in filenames.items():
             image = Image.open(filename)
             callback_manager.add()
-            embedder_run = partial(self.emdedder, image, partial(embedder_callback, image_id))
+            self.emdedder(image, partial(embedder_callback, image_id))
 
-        embedder_run()
         callback_manager.wait()
 
-    def get_neighbors(self, query_image_url: str, k: int = 10, similarity: str = "cosine") -> tuple[list[tuple[float, str]], Image.Image]:
+    def get_predictions(self, image_ids: list[int]) -> dict[int, np.ndarray]:
+        files = dict(self.get_filenames(image_ids))
+        results = {}
+        data_lock = Lock()
+        callback_manager = CallbackManager()
+
+        def detector_callback(image_id, bboxes):
+            with data_lock:
+                results[image_id] = bboxes
+                callback_manager.done()
+
+        for image_id in image_ids:
+            filename = files[image_id]
+            image = Image.open(filename)
+            callback_manager.add()
+            self.detector(image, partial(detector_callback, image_id))
+
+        callback_manager.wait()
+        return results
+
+    def get_neighbors(self, query_image_url: str, k: int = 10, similarity: str = "cosine") -> tuple[list[tuple[float, Image.Image]], Image.Image]:
         image = download_image(query_image_url)
         callback_manager = CallbackManager()
 
@@ -128,9 +151,18 @@ class PGVectorClient:
         assert query_embedding is not None, f"Failed to build embedding for image url: {query_image_url}"
 
         query = f"""
-            SELECT %s {self.SIMILARITY_FUNCTIONS[similarity]} embedding AS similarity, filename FROM image_embeddings
+            SELECT %s {self.SIMILARITY_FUNCTIONS[similarity]} embedding AS similarity, images.id, images.filename FROM image_embeddings
             JOIN images ON image_embeddings.image_id = images.id ORDER BY similarity DESC LIMIT %s
         """
+        def fetch_images_and_draw_bboxes(cur):
+            images = cur.fetchall()
+            image_ids = [image_id for _, image_id, _ in images]
+            predictions = self.get_predictions(image_ids)
+            result = []
+            for score, image_id, filename in images:
+                img = Image.open(filename)
+                result.append((score, self.detector.draw_bboxes(predictions[image_id], img)))
+            return result
 
         def detector_callback(bboxes):
             callback_result.append(self.detector.draw_bboxes(bboxes, image))
@@ -141,6 +173,6 @@ class PGVectorClient:
         callback_manager.wait()
 
         return (
-            self.execute_query(query=query, params=(query_embedding, k), fetch=lambda cur: [(row[0], row[1]) for row in cur.fetchall()]),
+            self.execute_query(query=query, params=(query_embedding, k), fetch=fetch_images_and_draw_bboxes),
             callback_result.pop()
         )

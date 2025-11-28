@@ -8,7 +8,7 @@ import numpy as np
 import PIL.Image as PILImage
 from PIL.Image import Image as PillowImage
 
-from .constants import LOGGER_FORMAT
+from .constants import LOG_LEVEL, LOGGER_FORMAT
 
 def chunked_iter(iterable, chunk_size=100):
     it = iter(iterable)
@@ -47,6 +47,7 @@ def create_logger():
     import logging
     logger = logging.getLogger(__name__)
     logging.basicConfig(format=LOGGER_FORMAT)
+    logger.setLevel(LOG_LEVEL)
     return logger
 
 def cross_iou_matrix(x1: np.ndarray, y1: np.ndarray, x2: np.ndarray, y2: np.ndarray) -> np.ndarray:
